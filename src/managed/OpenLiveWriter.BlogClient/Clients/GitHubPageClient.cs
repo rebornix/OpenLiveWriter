@@ -132,12 +132,24 @@ namespace OpenLiveWriter.BlogClient.Clients
                 throw new BlogClientPostAsDraftUnsupportedException();
             }
 
-            // TODO: Follow Jekyll config: slugify mode, https://github.com/jekyll/jekyll/blob/master/lib/jekyll/utils.rb#L158
-            var slug = (new Regex("[^a-zA-Z0-9]")).Replace(post.Title, "-");
-            // TODO: For posts in Jekyll, the filename contains publish date while draft and pages are dateless. https://github.com/jekyll/jekyll/blob/master/lib/jekyll/document.rb#L9
-            var fileName = String.Concat(post.DatePublishedOverride.ToString("yyyy-MM-dd"), "-", slug, ".md");
+            string fileName, postLocation;
 
-            var httpWebRequest = (HttpWebRequest) WebRequest.Create(String.Concat(RepositoryUri, _postApiUrl.AbsolutePath, "/contents/_posts/", fileName));
+            if (publish)
+            {
+                // TODO: Follow Jekyll config: slugify mode, https://github.com/jekyll/jekyll/blob/master/lib/jekyll/utils.rb#L158
+                var slug = (new Regex("[^a-zA-Z0-9]")).Replace(post.Title, "-");
+                // TODO: For posts in Jekyll, the filename contains publish date while draft and pages are dateless. https://github.com/jekyll/jekyll/blob/master/lib/jekyll/document.rb#L9
+                fileName = String.Concat(post.DatePublishedOverride.ToString("yyyy-MM-dd"), "-", slug, ".md");
+
+                postLocation = "/contents/_posts/";
+            }
+            else
+            {
+                fileName = post.Title;
+                postLocation = "/contents/_drafts/";
+            }
+
+            var httpWebRequest = (HttpWebRequest) WebRequest.Create(String.Concat(RepositoryUri, _postApiUrl.AbsolutePath, postLocation, fileName));
             var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(String.Concat(Credentials.Username, ":", Credentials.Password)));
             httpWebRequest.Headers.Add("Authorization", "Basic " + encoded);
             httpWebRequest.UserAgent = "DD local";
@@ -147,7 +159,7 @@ namespace OpenLiveWriter.BlogClient.Clients
             var json = JsonConvert.SerializeObject(new
             {
                 // TODO: make commit message configurable?
-                message = "new blog post: " + post.Title,
+                message = (publish ? "new blog post: " : "draft blog post: ") + post.Title,
                 content = Convert.ToBase64String(Encoding.UTF8.GetBytes(post.Contents))
             });
 
