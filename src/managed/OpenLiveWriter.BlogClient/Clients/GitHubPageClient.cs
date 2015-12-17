@@ -145,7 +145,7 @@ namespace OpenLiveWriter.BlogClient.Clients
             }
             else
             {
-                fileName = post.Title;
+                fileName = String.Concat(post.Title, ".md");
                 postLocation = "/contents/_drafts/";
             }
 
@@ -179,7 +179,55 @@ namespace OpenLiveWriter.BlogClient.Clients
 
         public bool EditPost(string blogId, BlogPost post, INewCategoryContext newCategoryContext, bool publish, out string etag, out XmlDocument remotePost)
         {
-            throw new NotImplementedException();
+            if (!publish && !Options.SupportsPostAsDraft)
+            {
+                Trace.Fail("Post to draft not supported on this provider");
+                throw new BlogClientPostAsDraftUnsupportedException();
+            }
+
+            string fileName, postLocation;
+
+            if (publish)
+            {
+                // TODO: Follow Jekyll config: slugify mode, https://github.com/jekyll/jekyll/blob/master/lib/jekyll/utils.rb#L158
+                var slug = (new Regex("[^a-zA-Z0-9]")).Replace(post.Title, "-");
+                // TODO: For posts in Jekyll, the filename contains publish date while draft and pages are dateless. https://github.com/jekyll/jekyll/blob/master/lib/jekyll/document.rb#L9
+                fileName = String.Concat(post.DatePublishedOverride.ToString("yyyy-MM-dd"), "-", slug, ".md");
+
+                postLocation = "/contents/_posts/";
+            }
+            else
+            {
+                fileName = String.Concat(post.Title, ".md");
+                postLocation = "/contents/_drafts/";
+            }
+
+            var httpWebRequest = (HttpWebRequest)WebRequest.Create(String.Concat(RepositoryUri, _postApiUrl.AbsolutePath, postLocation, fileName));
+            var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(String.Concat(Credentials.Username, ":", Credentials.Password)));
+            httpWebRequest.Headers.Add("Authorization", "Basic " + encoded);
+            httpWebRequest.UserAgent = "DD local";
+            httpWebRequest.Method = "PUT";
+            httpWebRequest.ContentType = "application/json; charset=utf-8";
+
+            var json = JsonConvert.SerializeObject(new
+            {
+                // TODO: make commit message configurable?
+                message = (publish ? "update blog post: " : "draft blog post: ") + post.Title,
+                content = Convert.ToBase64String(Encoding.UTF8.GetBytes(post.Contents))
+            });
+
+            using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
+            {
+                streamWriter.Write(json);
+                streamWriter.Flush();
+            }
+
+            var response = (HttpWebResponse)httpWebRequest.GetResponse();
+
+            etag = "";
+            remotePost = null;
+
+            return true;
         }
 
         /// <summary>
