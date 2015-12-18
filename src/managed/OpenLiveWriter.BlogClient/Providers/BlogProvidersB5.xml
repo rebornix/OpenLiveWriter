@@ -584,6 +584,7 @@
 		]]>
     </postApiUrl>
     <options>
+      <supportsPostAsDraft>Yes</supportsPostAsDraft>
     </options>
   </provider>
 </providers>
