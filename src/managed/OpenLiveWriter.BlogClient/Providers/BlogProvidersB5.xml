@@ -584,7 +584,7 @@
 		]]>
     </postApiUrl>
     <options>
-      <supportsMultipleCategories>Yes</supportsMultipleCategories>
+      <supportsPostAsDraft>Yes</supportsPostAsDraft>
     </options>
   </provider>
 </providers>
